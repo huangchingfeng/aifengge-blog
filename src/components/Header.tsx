@@ -13,7 +13,7 @@ export function Header() {
         {/* Logo */}
         <Link href="/blog" className="flex items-center space-x-2">
           <span className="text-xl font-bold">AI峰哥</span>
-          <span className="text-sm text-muted-foreground">部落格</span>
+          <span className="text-sm text-muted-foreground">企業AI實戰培訓</span>
         </Link>
 
         {/* Desktop Navigation */}
