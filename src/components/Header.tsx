@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Search } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,7 +14,9 @@ export function Header() {
         {/* Logo */}
         <Link href="/blog" className="flex items-center space-x-2">
           <span className="text-xl font-bold">AI峰哥</span>
-          <span className="text-sm text-muted-foreground">企業AI實戰培訓</span>
+          <span className="text-sm text-muted-foreground hidden sm:inline">
+            企業AI實戰培訓
+          </span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -46,13 +49,29 @@ export function Header() {
           </Link>
         </nav>
 
-        {/* Mobile Menu Button */}
-        <button
-          className="md:hidden p-2"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        {/* Right Actions */}
+        <div className="flex items-center space-x-2">
+          <Link
+            href="/blog?search=true"
+            className="p-2 rounded-md hover:bg-muted transition-colors hidden md:flex"
+            title="搜尋文章"
+          >
+            <Search className="h-5 w-5" />
+          </Link>
+          <ThemeToggle />
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Navigation */}

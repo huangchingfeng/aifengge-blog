@@ -4,19 +4,23 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { posts, categories, users, tags, postTags } from "../../../../drizzle/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { formatDate, calculateReadingTime } from "@/lib/utils";
 import { ArrowLeft, Eye, Clock, Calendar } from "lucide-react";
 import { ReadingProgressBar } from "@/components/ReadingProgressBar";
 import { AuthorBio } from "@/components/AuthorBio";
 import { SubstackCTA } from "@/components/SubstackCTA";
+import { ShareButtons } from "@/components/ShareButtons";
+import { ArticleJsonLd } from "@/components/JsonLd";
 import { marked } from "marked";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
-async function getPost(slug: string) {
+// 取得文章資料（不更新瀏覽次數，用於 metadata 和頁面）
+async function getPostData(slug: string) {
   try {
     const [post] = await db
       .select({
@@ -53,12 +57,6 @@ async function getPost(slug: string) {
       .leftJoin(tags, eq(postTags.tagId, tags.id))
       .where(eq(postTags.postId, post.id));
 
-    // 增加瀏覽次數
-    await db
-      .update(posts)
-      .set({ viewCount: post.viewCount + 1 })
-      .where(eq(posts.id, post.id));
-
     return {
       ...post,
       tags: postTagsList,
@@ -69,8 +67,21 @@ async function getPost(slug: string) {
   }
 }
 
+// 增加瀏覽次數（使用 SQL 原子操作避免競爭條件）
+async function incrementViewCount(postId: number) {
+  try {
+    await db
+      .update(posts)
+      .set({ viewCount: sql`${posts.viewCount} + 1` })
+      .where(eq(posts.id, postId));
+  } catch (error) {
+    console.error("Error incrementing view count:", error);
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = await getPost(params.slug);
+  const { slug } = await params;
+  const post = await getPostData(slug);
 
   if (!post) {
     return {
@@ -78,12 +89,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aifengge.com";
+
   return {
     title: post.title,
     description: post.excerpt || `閱讀 ${post.title} - AI峰哥部落格`,
+    alternates: {
+      canonical: `${siteUrl}/blog/${post.slug}`,
+    },
     openGraph: {
       title: post.title,
       description: post.excerpt || "",
+      url: `${siteUrl}/blog/${post.slug}`,
       images: post.coverImage ? [post.coverImage] : [],
       type: "article",
       publishedTime: post.publishedAt?.toISOString(),
@@ -99,17 +116,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const post = await getPost(params.slug);
+  const { slug } = await params;
+  const post = await getPostData(slug);
 
   if (!post) {
     notFound();
   }
 
+  // 只在頁面實際渲染時增加瀏覽次數（不影響 metadata 生成）
+  await incrementViewCount(post.id);
+
   const readingTime = calculateReadingTime(post.content || "");
-  const htmlContent = marked(post.content || "");
+  const rawHtml = await marked(post.content || "");
+  const htmlContent = sanitizeHtml(rawHtml);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aifengge.com";
+  const articleUrl = `${siteUrl}/blog/${post.slug}`;
 
   return (
     <>
+      <ArticleJsonLd
+        title={post.title}
+        description={post.excerpt || ""}
+        url={articleUrl}
+        imageUrl={post.coverImage || ""}
+        datePublished={post.publishedAt?.toISOString() || ""}
+        authorName={post.authorName || "阿峰老師"}
+      />
       <ReadingProgressBar />
 
       <article className="min-h-screen">
@@ -151,7 +183,7 @@ export default async function BlogPostPage({ params }: Props) {
               </span>
               <span className="flex items-center gap-1">
                 <Eye className="h-4 w-4" />
-                {post.viewCount} 次瀏覽
+                {post.viewCount + 1} 次瀏覽
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
@@ -197,6 +229,9 @@ export default async function BlogPostPage({ params }: Props) {
             className="prose max-w-none"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
+
+          {/* Share Buttons */}
+          <ShareButtons url={articleUrl} title={post.title} />
 
           {/* Author Bio */}
           <AuthorBio />

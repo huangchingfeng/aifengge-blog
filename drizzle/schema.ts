@@ -7,6 +7,7 @@ import {
   integer,
   boolean,
   pgEnum,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -20,7 +21,7 @@ export const users = pgTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 50 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -64,16 +65,23 @@ export const posts = pgTable("posts", {
 });
 
 // PostTags 表 (多對多關聯)
-export const postTags = pgTable("postTags", {
-  id: serial("id").primaryKey(),
-  postId: integer("postId")
-    .notNull()
-    .references(() => posts.id, { onDelete: "cascade" }),
-  tagId: integer("tagId")
-    .notNull()
-    .references(() => tags.id, { onDelete: "cascade" }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+export const postTags = pgTable(
+  "postTags",
+  {
+    id: serial("id").primaryKey(),
+    postId: integer("postId")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    tagId: integer("tagId")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    // 確保同一篇文章不會重複加入相同標籤
+    postTagUnique: uniqueIndex("post_tag_unique_idx").on(table.postId, table.tagId),
+  })
+);
 
 // 付費文章存取白名單
 export const articleAccessWhitelist = pgTable("articleAccessWhitelist", {

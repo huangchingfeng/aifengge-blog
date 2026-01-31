@@ -1,15 +1,15 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { posts, categories, users } from "../../../../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { formatDate, calculateReadingTime } from "@/lib/utils";
-import { ArrowLeft, Eye, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { PostsGrid } from "@/components/PostCard";
+import type { Post } from "@/types/post";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 async function getCategoryWithPosts(slug: string) {
@@ -24,7 +24,7 @@ async function getCategoryWithPosts(slug: string) {
     if (!category) return null;
 
     // 獲取該分類的文章
-    const categoryPosts = await db
+    const categoryPosts: Post[] = await db
       .select({
         id: posts.id,
         title: posts.title,
@@ -54,21 +54,28 @@ async function getCategoryWithPosts(slug: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const data = await getCategoryWithPosts(params.slug);
+  const { slug } = await params;
+  const data = await getCategoryWithPosts(slug);
 
   if (!data) {
     return { title: "分類不存在" };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aifengge.com";
+
   return {
     title: `${data.category.name} - AI峰哥部落格`,
     description:
       data.category.description || `瀏覽 ${data.category.name} 分類的所有文章`,
+    alternates: {
+      canonical: `${siteUrl}/blog/category/${slug}`,
+    },
   };
 }
 
 export default async function CategoryPage({ params }: Props) {
-  const data = await getCategoryWithPosts(params.slug);
+  const { slug } = await params;
+  const data = await getCategoryWithPosts(slug);
 
   if (!data) {
     notFound();
@@ -108,66 +115,11 @@ export default async function CategoryPage({ params }: Props) {
       {/* Posts Grid */}
       <section className="py-12">
         <div className="container">
-          {categoryPosts.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-muted-foreground">此分類目前沒有文章</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {categoryPosts.map((post) => (
-                <article
-                  key={post.id}
-                  className="group border rounded-lg overflow-hidden bg-card hover:shadow-lg transition-shadow"
-                >
-                  <Link href={`/blog/${post.slug}`}>
-                    <div className="relative aspect-video overflow-hidden">
-                      {post.coverImage ? (
-                        <Image
-                          src={post.coverImage}
-                          alt={post.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <span className="text-muted-foreground">No Image</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-6 space-y-3">
-                      <h2 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
-                        {post.title}
-                      </h2>
-
-                      {post.excerpt && (
-                        <p className="text-muted-foreground text-sm line-clamp-2">
-                          {post.excerpt}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
-                        <span>{post.authorName || "阿峰老師"}</span>
-                        <span>
-                          {post.publishedAt
-                            ? formatDate(post.publishedAt)
-                            : ""}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-4 w-4" />
-                          {post.viewCount}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {calculateReadingTime(post.content || "")} 分鐘
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                </article>
-              ))}
-            </div>
-          )}
+          <PostsGrid
+            posts={categoryPosts}
+            showCategory={false}
+            emptyMessage="此分類目前沒有文章"
+          />
         </div>
       </section>
     </div>

@@ -1,15 +1,15 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { posts, tags, postTags, users, categories } from "../../../../../drizzle/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
-import { formatDate, calculateReadingTime } from "@/lib/utils";
-import { ArrowLeft, Eye, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { PostsGrid } from "@/components/PostCard";
+import type { Post } from "@/types/post";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 async function getTagWithPosts(slug: string) {
@@ -32,11 +32,11 @@ async function getTagWithPosts(slug: string) {
     const postIds = postTagsList.map((pt) => pt.postId);
 
     if (postIds.length === 0) {
-      return { tag, posts: [] };
+      return { tag, posts: [] as Post[] };
     }
 
     // 獲取文章
-    const tagPosts = await db
+    const tagPosts: Post[] = await db
       .select({
         id: posts.id,
         title: posts.title,
@@ -67,20 +67,27 @@ async function getTagWithPosts(slug: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const data = await getTagWithPosts(params.slug);
+  const { slug } = await params;
+  const data = await getTagWithPosts(slug);
 
   if (!data) {
     return { title: "標籤不存在" };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aifengge.com";
+
   return {
     title: `#${data.tag.name} - AI峰哥部落格`,
     description: `瀏覽所有標記為 #${data.tag.name} 的文章`,
+    alternates: {
+      canonical: `${siteUrl}/blog/tag/${slug}`,
+    },
   };
 }
 
 export default async function TagPage({ params }: Props) {
-  const data = await getTagWithPosts(params.slug);
+  const { slug } = await params;
+  const data = await getTagWithPosts(slug);
 
   if (!data) {
     notFound();
@@ -110,72 +117,7 @@ export default async function TagPage({ params }: Props) {
       {/* Posts Grid */}
       <section className="py-12">
         <div className="container">
-          {tagPosts.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-muted-foreground">此標籤目前沒有文章</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {tagPosts.map((post) => (
-                <article
-                  key={post.id}
-                  className="group border rounded-lg overflow-hidden bg-card hover:shadow-lg transition-shadow"
-                >
-                  <Link href={`/blog/${post.slug}`}>
-                    <div className="relative aspect-video overflow-hidden">
-                      {post.coverImage ? (
-                        <Image
-                          src={post.coverImage}
-                          alt={post.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <span className="text-muted-foreground">No Image</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-6 space-y-3">
-                      {post.categoryName && (
-                        <span className="inline-block px-2 py-1 text-xs font-medium bg-muted rounded">
-                          {post.categoryName}
-                        </span>
-                      )}
-
-                      <h2 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
-                        {post.title}
-                      </h2>
-
-                      {post.excerpt && (
-                        <p className="text-muted-foreground text-sm line-clamp-2">
-                          {post.excerpt}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
-                        <span>{post.authorName || "阿峰老師"}</span>
-                        <span>
-                          {post.publishedAt
-                            ? formatDate(post.publishedAt)
-                            : ""}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-4 w-4" />
-                          {post.viewCount}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {calculateReadingTime(post.content || "")} 分鐘
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                </article>
-              ))}
-            </div>
-          )}
+          <PostsGrid posts={tagPosts} emptyMessage="此標籤目前沒有文章" />
         </div>
       </section>
     </div>
