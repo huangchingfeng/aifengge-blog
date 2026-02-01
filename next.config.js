@@ -34,6 +34,15 @@ const nextConfig = {
         protocol: "https",
         hostname: "avatars.githubusercontent.com",
       },
+      // 部落格文章圖片來源
+      {
+        protocol: "https",
+        hostname: "d2xsxph8kpxj0f.cloudfront.net",
+      },
+      {
+        protocol: "https",
+        hostname: "files.manuscdn.com",
+      },
     ],
   },
 };
