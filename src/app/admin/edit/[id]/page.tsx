@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../layout";
+import { useAuth } from "../../auth-context";
 
 interface Category {
   id: number;
